@@ -9,9 +9,11 @@ class PostExtractor(ABC):
     post_element: WebElement
     driver: WebDriver
 
-    def __init__(self, post_element: WebElement, driver: WebDriver):
+    def __init__(self, post_element: WebElement, driver: WebDriver, source_id="", type=""):
         self.post_element = post_element
         self.driver = driver       
+        self.source_id = source_id
+        self.type = type
 
     @abstractmethod
     def extract_post_author(self):
@@ -98,6 +100,8 @@ class PostExtractor(ABC):
         # post.care = care
         # post.angry = angry
         # post.dataInListComments = comments
+        post.source_id = self.source_id
+        post.type = self.type
 
         return post     
     

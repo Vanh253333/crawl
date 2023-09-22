@@ -13,13 +13,14 @@ from wsclient.websocket_client import WebsocketClient
 from account_utils import read_and_convert_account_from_json
 import queue
 import time
+from utils.log_utils import logger
 
 class CrawlerManager(object):
     crawler_process = dict()
     crawler_config = ""
-    local_accounts = {}#read_and_convert_account_from_json(file_path=config.account_path)
+    # local_accounts = {}#read_and_convert_account_from_json(file_path=config.account_path)
     crawler_threads = []
-    
+    local_accounts = read_and_convert_account_from_json(file_path=config.account_path)
 
     def __init__(self, device_config):
         self.ws_url = None
@@ -40,6 +41,20 @@ class CrawlerManager(object):
         self.ws.connect_background()
         
 
+    # def load_device_config_and_create_clawer_thread(self, config):
+    #     account = Account(config["account"]["username"], config["account"]["password"], "")
+    #     array_data = config["account"]["platform"].split("+")
+    #     if len(array_data) > 1:
+    #         account.two_fa_code = config["account"]["platform"].split("+")[1]
+    #     if len(array_data) > 2:
+    #         account.proxy = config["account"]["platform"].split("+")[2]
+    #     if account.username not in self.local_accounts:
+    #         self.local_accounts[account.username] = account
+    #     else:
+    #         account = self.local_accounts[account.username]
+    #     config['keyword_noparse'] = config['keyword']
+    #     config['keyword'] = self.parse_keyword(keyword_list_raw=config['keyword'])
+    #     self.create_and_run_crawler_thread(account=account, config=config)
     def load_device_config_and_create_clawer_thread(self, config):
         account = Account(config["account"]["username"], config["account"]["password"], "")
         array_data = config["account"]["platform"].split("+")
@@ -51,10 +66,11 @@ class CrawlerManager(object):
             self.local_accounts[account.username] = account
         else:
             account = self.local_accounts[account.username]
-        config['keyword_noparse'] = config['keyword']
-        config['keyword'] = self.parse_keyword(keyword_list_raw=config['keyword'])
+        config['mode']['keyword_noparse'] = config['mode']['keyword']
+        config['mode']['keyword'] = self.parse_keyword(keyword_list_raw=config['mode']['keyword'])
         self.create_and_run_crawler_thread(account=account, config=config)
-        
+
+
     def parse_keyword(self, keyword_list_raw: str) -> List[str]:
         keyword_list_raw_dict = json.loads(keyword_list_raw)
         keyword_list: List[str] = []
@@ -89,24 +105,63 @@ class CrawlerManager(object):
         # self.add_crawler(crawler2)
 
         # group
-        share_queue = queue.Queue(maxsize=100)
-        crawler1 = CrawlerThread(account, config["account"]["platform"], mode_group = "get_link", group_id ="j2team.community", share_queue=share_queue)
-        crawler1.setDaemon(True)
-        crawler1.start()
-        #crawler1.run()
-        self.add_crawler(crawler1)
+        # share_queue = queue.Queue(maxsize=100)
+        # crawler1 = CrawlerThread(account, config["account"]["platform"], mode_group = "get_link", group_id ="j2team.community", share_queue=share_queue)
+        # crawler1.setDaemon(True)
+        # crawler1.start()
+        # #crawler1.run()
+        # self.add_crawler(crawler1)
 
-        time.sleep(20)
+        # time.sleep(20)
 
-        crawler2 = CrawlerThread(account, config["account"]["platform"], mode_group = "ex_post", group_id ="j2team.community", share_queue=share_queue)
-        #crawler2.setDaemon(True)
-        crawler2.start()        
+        # crawler2 = CrawlerThread(account, config["account"]["platform"], mode_group = "ex_post", group_id ="j2team.community", share_queue=share_queue)
+        # #crawler2.setDaemon(True)
+        # crawler2.start()        
 
+        if int(config['mode']['id']) == 1: #mode search
+
+            # crawler = CrawlerThread(account, config["account"]["platform"], mode=1, keywords=config["mode"]["keyword"], keyword_noparse=config["mode"]["keyword_noparse"], mode_search = "ex_post", share_queue = share_queue)
+
+            share_queue = queue.Queue(maxsize=100)
+            crawler1 = CrawlerThread(account, config["account"]["platform"], mode=1, keywords=config["mode"]["keyword"], keyword_noparse=config["mode"]["keyword_noparse"], mode_search = "get_link", share_queue = share_queue)
+            crawler1.setDaemon(True)
+            crawler1.start()
+            self.add_crawler(crawler1)
+
+            time.sleep(20)
+
+            crawler2 = CrawlerThread(account, config["account"]["platform"], mode=1, keywords=config["mode"]["keyword"], keyword_noparse=config["mode"]["keyword_noparse"], mode_search = "ex_post", share_queue = share_queue)
+            crawler2.start()
+            self.add_crawler(crawler2)
+        elif int(config['mode']['id']) == 2: #mode get post group
+            share_queue = queue.Queue(maxsize=100)
+            crawler1 = CrawlerThread(account, config["account"]["platform"], mode=2, mode_group = "get_link", group_id =config['mode']['group_id'], share_queue=share_queue)
+            crawler1.setDaemon(True)
+            crawler1.start()
+            #crawler1.run()
+            self.add_crawler(crawler1)
+
+            time.sleep(20)
+
+            crawler2 = CrawlerThread(account, config["account"]["platform"], mode=2, mode_group = "ex_post", group_id =config['mode']['group_id'], share_queue=share_queue)
+            #crawler2.setDaemon(True)
+            crawler2.start()
+            #crawler2.run()
+            self.add_crawler(crawler2)
+        elif int(config['mode']['id']) == 3: #mode get post page
+            crawler = CrawlerThread(account, config["account"]["platform"], mode=3, mode_group = "ex_post", group_id =config['mode']['group_id'])
+            crawler.setDaemon(True)
+            #crawler.start()
+            crawler.run()
+            self.add_crawler(crawler)
+        elif int(config['mode']['id']) == 4: #mode auto fb
+            pass
+        else:
+            logger.error("No mode")
 
 
     def add_crawler(self, crawler):
         self.crawler_threads.append(crawler)
-        
         
     def update_device_config_to_json(self, device_config, file_path):
         device_config_list = device_config_utils.get_local_device_config()

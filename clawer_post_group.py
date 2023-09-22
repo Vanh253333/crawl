@@ -499,40 +499,55 @@ class PostGroupExFromLink():
         
 class PostGroupDeskopExFromLink():
     driver: WebDriver
+
     POST_XPATH: str = './/div[@aria-posinset="1"]'
     POST_SHARE_XPATH: str = ".//div[@class='x1y332i5']"
+    LINK_POST_SHARE_XPATH: str = ".//span[not(@class)]//a[contains(@class, 'xt0b8zv xo1l8bm') and @tabindex and @role='link']"
     posts: List[Post] = []
     callback: Optional[Callable[[Post], None]] = None
     post_crawl_done = []
     count_post_ex = 0
     MAX_SIZE_POST = 1000
     
-    def __init__(self, driver: WebDriver, group_id : str, share_queue: queue.Queue(), callback: Optional[Callable[[Post], None]] = None, ) -> None:
+    def __init__(self, driver: WebDriver, type:str, group_id : str, share_queue: queue.Queue(), callback: Optional[Callable[[Post], None]] = None, ) -> None:
         self.callback = callback
         self.driver = driver
+        self.type = type
         self.group_id = group_id
         self.action = ActionChains(driver)
         self.q_posts_group = share_queue
         self.queueLock = threading.Lock()
 
 
-    def _get_current_post_element(self) -> Optional[WebElement]:
-        try:
-            self.driver.implicitly_wait(5)
-            return self.driver.find_element(By.XPATH, self.POST_XPATH)
-        except NoSuchElementException:
-            logger.error(f"Not found {self.POST_XPATH}")
-            return None
-        except Exception as e:
-            logger.error(e, exc_info=True)
-            return None
+    # def _get_current_post_element(self) -> Optional[WebElement]:
+    #     try:
+    #         self.driver.implicitly_wait(5)
+    #         return self.driver.find_element(By.XPATH, self.POST_XPATH)
+    #     except NoSuchElementException:
+    #         logger.error(f"Not found {self.POST_XPATH}")
+    #         return None
+    #     except Exception as e:
+    #         logger.error(e, exc_info=True)
+    #         return None
         
-    def _get_post_share_element(self) -> Optional[WebElement]:
+    # def _get_post_share_element(self) -> Optional[WebElement]:
+    #     try:
+    #         self.driver.implicitly_wait(5)
+    #         return self.driver.find_element(By.XPATH, self.POST_SHARE_XPATH)
+    #     except NoSuchElementException:
+    #         logger.error(f"Not found {self.POST_SHARE_XPATH}")
+    #         return None
+    #     except Exception as e:
+    #         logger.error(e, exc_info=True)
+    #         return None
+
+    def _get_element_by_xpath(self, XPATH_, parent_element: Optional[WebElement] = None):
         try:
             self.driver.implicitly_wait(5)
-            return self.driver.find_element(By.XPATH, self.POST_SHARE_XPATH)
-        except NoSuchElementException:
-            logger.error(f"Not found {self.POST_SHARE_XPATH}")
+            parent_element = parent_element if parent_element else self.driver
+            return parent_element.find_element(by=By.XPATH, value=XPATH_)
+        except NoSuchElementException as e:
+            logger.error(f"Not found {XPATH_}")
             return None
         except Exception as e:
             logger.error(e, exc_info=True)
@@ -544,7 +559,7 @@ class PostGroupDeskopExFromLink():
         try:
             a_post_content_element = post_element.find_element(By.XPATH, value=".//span[not(@class)]//a[contains(@class, 'xt0b8zv xo1l8bm') and @tabindex and @role='link']")
             self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", a_post_content_element)
-            self.action.move_to_element(a_post_content_element).click().perform()
+            self.action.click(a_post_content_element).perform()
             # a_post_content_element.click()
         except NoSuchElementException:
             logger.error(f"Not found xpath enter post share")
@@ -556,6 +571,18 @@ class PostGroupDeskopExFromLink():
         return 1
 
     
+    def _get_link_post_share(self, element):
+        link_post_share = ""
+        element_link = self._get_element_by_xpath(self.LINK_POST_SHARE_XPATH, element)
+        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element_link)
+        #element_link.click()
+        self.action.move_to_element(element_link).perform()
+        CommonUtils.sleep_random_in_range(1,4)
+        element_link = self._get_element_by_xpath(self.LINK_POST_SHARE_XPATH, element)
+        link_post_share = element_link.get_attribute("href")
+        # time_post = element_link.accessible_name
+
+        return link_post_share
     
     def start(self):
         bCheck = True
@@ -579,12 +606,16 @@ class PostGroupDeskopExFromLink():
                 self.driver.get(link_post)
                 slept_time = CommonUtils.sleep_random_in_range(2, 5)
                 logger.debug(f"Slept {slept_time}")
-                post_element = self._get_current_post_element()
+                post_element = self._get_element_by_xpath(XPATH_=self.POST_XPATH)
 
                 if post_element:
-                    post_share_element = self._get_post_share_element()
-                    isPostShare = True if post_share_element else False
-                    post_extractor: PostDesktopExtractor = PostDesktopExtractor(driver=self.driver, post_element=post_element)
+                    post_share_element = self._get_element_by_xpath(XPATH_=self.POST_SHARE_XPATH)
+                    # isPostShare = True if post_share_element else False
+                    link_post_share = ""
+                    if post_share_element:
+                        link_post_share = self._get_link_post_share(element=post_share_element)
+
+                    post_extractor: PostDesktopExtractor = PostDesktopExtractor(driver=self.driver, post_element=post_element, type=self.type)
                     post = post_extractor.extract()
                     retry_time = 0
                     def retry_extract(post, retry_time):
@@ -604,16 +635,16 @@ class PostGroupDeskopExFromLink():
                     self.posts.append(post)
                     self.count_post_ex += 1
 
-                    if isPostShare:
-                        enter_post = self._enter_post_share(post_share_element)
-                        self.driver.implicitly_wait(5)
-                        self.driver.refresh()
+                    if link_post_share:
+                        # enter_post = self._enter_post_share(post_share_element)
+                        self.driver.get(link_post_share)
                         slept_time = CommonUtils.sleep_random_in_range(1, 3)
                         logger.debug(f"Slept {slept_time}")
-
-                        post_share_element = self._get_current_post_element()
+                        post_share_element = self._get_element_by_xpath(XPATH_=self.POST_XPATH)
+                        slept_time = CommonUtils.sleep_random_in_range(1, 5)
+                        logger.debug(f"Slept {slept_time}")
                         if post_share_element:
-                            post_share_extractor: PostDesktopExtractor = PostDesktopExtractor(driver=self.driver, post_element=post_share_element)
+                            post_share_extractor: PostDesktopExtractor = PostDesktopExtractor(driver=self.driver, post_element=post_share_element, source_id=post.id, type="facebook share")
                             post_share = post_share_extractor.extract()
                             retry_time = 0
                             retry_extract(post_share, retry_time)
