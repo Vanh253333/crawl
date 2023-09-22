@@ -18,7 +18,6 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
 from datetime import datetime, timedelta, date
 from jsonpath_ng import jsonpath, parse
-from utils.utils import write_data_to_file
 from utils.common_utils import ElementIterator
 
 class PostDesktopExtractor(PostExtractor):
@@ -29,10 +28,12 @@ class PostDesktopExtractor(PostExtractor):
     COMMENT_ID_REGEX_PATTERN = r"(?:reply_)?comment_id=(\d+)"
 
 
-    def __init__(self, post_element: WebElement, driver: WebDriver):
+    def __init__(self, post_element: WebElement, driver: WebDriver, source_id="", type=""):
         super().__init__(post_element=post_element, driver=driver)
         self.post_data = self.extract_post_infor()
         self.actions = ActionChains(driver)
+        self.source_id = source_id
+        self.type = type
     
     def _get_elements_by_xpath(self, XPATH_, parent_element: Optional[WebElement] = None):
         try:
@@ -57,18 +58,6 @@ class PostDesktopExtractor(PostExtractor):
         except Exception as e:
             logger.error(e, exc_info=True)
             return None
-        
-    def _get_reactions_element_by_xpath(self, XPATH_):
-        try:
-            self.driver.implicitly_wait(1)
-            return self.driver.find_element(by=By.XPATH, value=XPATH_)
-        except NoSuchElementException as e:
-            logger.warning(f"Not found {XPATH_}")
-            return None
-        except Exception as e:
-            logger.error(e, exc_info=True)
-            return None
-
     
     def extract_post_infor(self):
         logger.info("Start")
@@ -84,7 +73,6 @@ class PostDesktopExtractor(PostExtractor):
                     json_data = match[0].value
             except Exception as e:
                 logger.error(e)          
-                
             logger.info("End")
         else:
             logger.error(f"Not found {self.POST_INFOR_XPATH}")
@@ -93,9 +81,9 @@ class PostDesktopExtractor(PostExtractor):
 
     def extract_post_id(self)-> Optional[str]:
         logger.info("Start")
-        post_id = self.post_data["post_id"]
+        self.post_id = self.post_data["post_id"]
         logger.info("End")
-        return post_id
+        return self.post_id
     
     def extract_post_author(self):
         logger.info("Start")
@@ -118,7 +106,7 @@ class PostDesktopExtractor(PostExtractor):
         logger.info("Start")
         post_content_str: str = ''
         hashtag: List[str] = []
-        json_path = parse("$..rich_message")
+        json_path = parse("$..content..rich_message")
         matches = json_path.find(self.post_data)
         if matches:
             content_data = matches[0].value
@@ -249,7 +237,7 @@ class PostDesktopExtractor(PostExtractor):
                         logger.error(e, exc_info=True) 
 
             photo_plus = imgs[-1].text
-            if "+" in photo_plus:
+            if "+" in photo_plus and len(imgs) > 4:
                 try:
                     photo_plus = int(photo_plus.split("+")[-1])
                     SeleniumUtils.click_element(driver=self.driver, element=imgs[-1])
@@ -295,29 +283,40 @@ class PostDesktopExtractor(PostExtractor):
 
         commenter_avatar_element = self._get_element_by_xpath(XPATH_="./div[1]", parent_element=comment_element)
         if commenter_avatar_element:
-            image_element = commenter_avatar_element.find_element(By.TAG_NAME, value="image")
-            commenter_avata = image_element.get_attribute("xlink:href")
+            try:
+                commenter_image_element = commenter_avatar_element.find_element(By.TAG_NAME, value="image")
+                commenter_avata = commenter_image_element.get_attribute("xlink:href")
+            except NoSuchElementException:
+                logger.error("not found commenter_image_element")
+            except Exception as e:
+                logger(e)
         else:
             logger.error("not found commenter_avatar_element")
 
-        comment_id, comment_time = self.extract_comment_time(comment_element)
+        comment_id, reply_comment_id, comment_time = self.extract_comment_time(comment_element)
         comment_content = self.extract_comment_content(comment_element)
         comment_image = self.extract_comment_image(comment_element)
         comment_video = self.extract_comment_video(comment_element)
         reactions_comment = self.extract_comment_reactions(comment_element)
 
-        comment_post.id = comment_id
+        if reply_comment_id != "":
+            comment_post.id = reply_comment_id
+            comment_post.source_id = comment_id
+        else:
+            comment_post.id = comment_id
+            comment_post.source_id = self.post_id
+        comment_post.type = "facebook comment"
         comment_post.author = commenter_name
         comment_post.author_link = commenter_url
         comment_post.avatar = commenter_avata
         comment_post.content = comment_content
-        comment_post.link = f"https://www.facebook.com/{comment_id}"
-        comment_post.created_time = comment_time
+        comment_post.link = f"https://www.facebook.com/{comment_post.id}"
+        comment_post.created_time = self.convert_text_to_datetime(comment_time)
         comment_post.image_url = comment_image
         comment_post.video = comment_video
         comment_post.like, comment_post.comment, comment_post.haha, comment_post.wow, comment_post.sad, comment_post.love, comment_post.angry, comment_post.share = reactions_comment['like'], reactions_comment['comment'], reactions_comment['haha'] ,reactions_comment['wow'] , reactions_comment['sad'], reactions_comment['love'] ,reactions_comment['angry'] ,reactions_comment['share']
         comment_post.time_crawl = datetime.now()
-# ===================================================
+# ===================_______________=======================#
         self.on_post_available_callback(comment_post)
         return comment_post
 
@@ -325,6 +324,7 @@ class PostDesktopExtractor(PostExtractor):
     def extract_comment_time(self, comment_element: WebElement):
         logger.info("Start")
         comment_id: str = ""
+        reply_comment_id: str = ""
         comment_time_create: str = ""
 
         comment_time_element = self._get_element_by_xpath(XPATH_=".//ul//a", parent_element=comment_element)
@@ -341,15 +341,15 @@ class PostDesktopExtractor(PostExtractor):
                 logger.error(f"Not found regex {self.COMMENT_ID_REGEX_PATTERN} in link {comment_id_url}")
         else:
             logger.error("not found comment_time_element")
-        return comment_id, comment_time_create
+        return comment_id, reply_comment_id, comment_time_create
 
         
     def extract_comment_content(self, comment_element: WebElement) -> str:
         logger.info("Start")
         comment_content: str = ""
-        comment_content_element = self._get_element_by_xpath(XPATH_=".//div/span[@dir='auto' and @class]", parent_element=comment_element)
+        comment_content_element = self._get_element_by_xpath(XPATH_=".//div/span[@dir='auto' and @class and ./div]", parent_element=comment_element)
         if comment_content_element:
-            see_more_element = self._get_element_by_xpath(XPATH_=".//*[@role='button']", parent_element=comment_content_element)
+            see_more_element = self._get_element_by_xpath(XPATH_=".//div[@role='button']", parent_element=comment_content_element)
             if see_more_element:
                 see_more_element.click()
                 self.driver.implicitly_wait(1)
@@ -397,13 +397,13 @@ class PostDesktopExtractor(PostExtractor):
             "comment" : 0
         } 
         reaction_list = ["like", "haha", "wow", "sad", "love", "angry", "care"]
-        self.driver.implicitly_wait(5)
         comment_icon_element = self._get_element_by_xpath(XPATH_=".//div[@aria-label[contains(., 'reacted')] and @role='button']", parent_element=comment_element)
         if comment_icon_element:
             SeleniumUtils.click_element(driver=self.driver, element=comment_icon_element)
+            # self.driver.implicitly_wait(5)
             slept_time = CommonUtils.sleep_random_in_range(1, 3)
             logger.debug(f"Slept {slept_time}")
-            reactions_tab_list_element = self._get_reactions_element_by_xpath(XPATH_=".//div[@aria-labelledby and @role='dialog']//div[@role='tablist']")
+            reactions_tab_list_element = self._get_element_by_xpath(XPATH_=".//div[@aria-labelledby and @role='dialog']//div[@role='tablist']", parent_element=self.driver)
             if reactions_tab_list_element:
                 # print(reactions_tab_list_element.get_attribute("innerHTML"))
                 reactions_tab_elements = self._get_elements_by_xpath(XPATH_=".//div[@role='tab']", parent_element=reactions_tab_list_element)
@@ -438,7 +438,6 @@ class PostDesktopExtractor(PostExtractor):
                         self.driver.implicitly_wait(5)
                         repCmt = self._get_element_by_xpath(XPATH_=".//div[@role='button' and not(contains(., 'Hide'))][normalize-space(.)!='' and .//i]", parent_element=comment)
                         if repCmt:
-                            # self.driver.execute_script("arguments[0].scrollIntoView();", repCmt)
                             try:
                                 self.actions.move_to_element(repCmt).click().perform()
                                 self.driver.implicitly_wait(5)
@@ -463,7 +462,10 @@ class PostDesktopExtractor(PostExtractor):
                             comment_element_iterator.update(element_list=comment_area_element_list)
                 except StopIteration as e:
                     logger.debug(f"Đã hết comment của bài post")
-                    break                
+                    break    
+                except Exception as e:
+                    logger.error(e)
+                    break            
         else:
             logger.error("Not found comment_area_element")
         return post_comments
@@ -483,6 +485,7 @@ class PostDesktopExtractor(PostExtractor):
         finally:
             return int(number)
         
+
     def on_post_available_callback(self, post: Post):
         with open("result.txt", "a", encoding="utf-8") as file:
             file.write(f"{str(post)}\n")
@@ -491,4 +494,32 @@ class PostDesktopExtractor(PostExtractor):
                 file.write(f"🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷🇧🇷\n")
             else:
                 file.write(f"🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈\n")
+    
+    def convert_text_to_datetime(self, text):
+    # 1m, 1h, 1d, 1w, 1y
+        current_time = datetime.now()
+        if "m" in text:
+            minutes = int(text.strip('m'))
+            new_time = current_time - timedelta(minutes=minutes)
+            new_time = new_time.replace(microsecond=0, second=0)
+        elif "h" in text:
+            hours = int(text.strip('h'))
+            new_time = current_time - timedelta(hours=hours)
+            new_time = new_time.replace(microsecond=0, second=0, minute=0)
+        elif "d" in text:
+            days = int(text.strip('d'))
+            new_time = current_time - timedelta(days=days)
+            new_time = new_time.replace(microsecond=0, second=0, minute=0, hour=0)
+        elif "w" in text:
+            weeks = int(text.strip('w'))
+            new_time = current_time - timedelta(weeks=weeks)
+            new_time = new_time.replace(microsecond=0, second=0, minute=0, hour=0)
+        elif "y" in text:
+            years = int(text.strip('y'))
+            new_time = current_time - timedelta(years=years)
+            new_time = new_time.replace(microsecond=0, second=0, minute=0, hour=0)
+        
+        timestamp = int(new_time.timestamp())
+        return timestamp
+
     
