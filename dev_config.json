@@ -18,7 +18,7 @@
         "id": 12,
         "mode":
 		{
-			"id" : 3,
+			"id" : 2,
 			"name" : "search",
 			"keyword": "[{\"key\": \"minh quan\", \"subKey\": [\"\"]}]",
             "group_id": "j2team.community",
