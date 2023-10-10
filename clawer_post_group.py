@@ -644,7 +644,7 @@ class PostGroupDeskopExFromLink():
                         slept_time = CommonUtils.sleep_random_in_range(1, 5)
                         logger.debug(f"Slept {slept_time}")
                         if post_share_element:
-                            post_share_extractor: PostDesktopExtractor = PostDesktopExtractor(driver=self.driver, post_element=post_share_element, source_id=post.id, type="facebook share")
+                            post_share_extractor: PostDesktopExtractor = PostDesktopExtractor(driver=self.driver, post_element=post_share_element, source_id=post.id, type="facebook share ")
                             post_share = post_share_extractor.extract()
                             retry_time = 0
                             retry_extract(post_share, retry_time)

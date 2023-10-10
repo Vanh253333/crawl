@@ -18,9 +18,9 @@
         "id": 12,
         "mode":
 		{
-			"id" : 2,
+			"id" : 3,
 			"name" : "search",
-			"keyword": "[{\"key\": \"cillian murphy\", \"subKey\": [\"\"]}]",
+			"keyword": "[{\"key\": \"minh quan\", \"subKey\": [\"\"]}]",
             "group_id": "j2team.community",
 			"link_page": "",
 			"link" : "",

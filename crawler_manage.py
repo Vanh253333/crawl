@@ -41,20 +41,6 @@ class CrawlerManager(object):
         self.ws.connect_background()
         
 
-    # def load_device_config_and_create_clawer_thread(self, config):
-    #     account = Account(config["account"]["username"], config["account"]["password"], "")
-    #     array_data = config["account"]["platform"].split("+")
-    #     if len(array_data) > 1:
-    #         account.two_fa_code = config["account"]["platform"].split("+")[1]
-    #     if len(array_data) > 2:
-    #         account.proxy = config["account"]["platform"].split("+")[2]
-    #     if account.username not in self.local_accounts:
-    #         self.local_accounts[account.username] = account
-    #     else:
-    #         account = self.local_accounts[account.username]
-    #     config['keyword_noparse'] = config['keyword']
-    #     config['keyword'] = self.parse_keyword(keyword_list_raw=config['keyword'])
-    #     self.create_and_run_crawler_thread(account=account, config=config)
     def load_device_config_and_create_clawer_thread(self, config):
         account = Account(config["account"]["username"], config["account"]["password"], "")
         array_data = config["account"]["platform"].split("+")
@@ -90,38 +76,9 @@ class CrawlerManager(object):
         return keyword_list
 
         
-    def create_and_run_crawler_thread(self, account, config):
-        # search 
-        # share_queue = queue.Queue(maxsize=100)
-        # crawler1 = CrawlerThread(account, config["keyword"], config["account"]["platform"], keyword_noparse=config["keyword_noparse"], mode_search = "get_link", share_queue = share_queue)
-        # crawler1.setDaemon(True)
-        # crawler1.start()
-        # self.add_crawler(crawler1)
-
-        # time.sleep(20)
-
-        # crawler2 = CrawlerThread(account, config["keyword"], config["account"]["platform"], keyword_noparse=config["keyword_noparse"], mode_search = "ex_post", share_queue = share_queue)
-        # crawler2.start()
-        # self.add_crawler(crawler2)
-
-        # group
-        # share_queue = queue.Queue(maxsize=100)
-        # crawler1 = CrawlerThread(account, config["account"]["platform"], mode_group = "get_link", group_id ="j2team.community", share_queue=share_queue)
-        # crawler1.setDaemon(True)
-        # crawler1.start()
-        # #crawler1.run()
-        # self.add_crawler(crawler1)
-
-        # time.sleep(20)
-
-        # crawler2 = CrawlerThread(account, config["account"]["platform"], mode_group = "ex_post", group_id ="j2team.community", share_queue=share_queue)
-        # #crawler2.setDaemon(True)
-        # crawler2.start()        
+    def create_and_run_crawler_thread(self, account, config):     
 
         if int(config['mode']['id']) == 1: #mode search
-
-            # crawler = CrawlerThread(account, config["account"]["platform"], mode=1, keywords=config["mode"]["keyword"], keyword_noparse=config["mode"]["keyword_noparse"], mode_search = "ex_post", share_queue = share_queue)
-
             share_queue = queue.Queue(maxsize=100)
             crawler1 = CrawlerThread(account, config["account"]["platform"], mode=1, keywords=config["mode"]["keyword"], keyword_noparse=config["mode"]["keyword_noparse"], mode_search = "get_link", share_queue = share_queue)
             crawler1.setDaemon(True)
