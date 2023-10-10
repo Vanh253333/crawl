@@ -1,2 +1,0 @@
-class HTMLUtils:
-    @staticmethod
