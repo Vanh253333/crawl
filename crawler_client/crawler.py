@@ -100,55 +100,10 @@ class CrawlerThread(threading.Thread):
         self.web_browser.driver.get("https://facebook.com" + visit_url)
         get_list_post_from_account(self.web_browser)
 
-    def work_(self):
-        print("chuan bi in")
-
-        while self.is_active:
-            for keyword in self.keywords:
-                # post_mobile_search_extractor: PostDesktopSearchExtractor = PostDesktopSearchExtractor(driver=self.web_browser.driver, keyword=keyword, keyword_noparse=self.keyword_noparse, callback=self.on_post_available_callback)
-                # posts = post_mobile_search_extractor.start()
-                # logger.info(f"Send {len(posts)} to kafka")
-                #crawler_utils.push_kafka(posts=posts, comments=None)
-                try: 
-                    logger.info(f"Crawler post search: {keyword}")
-                    if self.kwargs['mode_search'] == 'get_link':
-                        link_post_search_extractor : LinkPostDesktopSearchExtractor = LinkPostDesktopSearchExtractor(driver=self.web_browser.driver, keyword=keyword,share_queue=self.kwargs['share_queue'])
-                        link_post_search_extractor.start_get_link_posts()
-                    elif self.kwargs['mode_search'] == 'ex_post':
-                        post_search_extractor : PostSearchExFromLink = PostSearchExFromLink(driver=self.web_browser.driver,keyword=keyword, keyword_noparse=self.kwargs['keyword_noparse'],share_queue=self.kwargs['share_queue'], callback=self.on_post_available_callback)
-                        for posts in post_search_extractor.start():
-                            logger.info(f"số bài post group đẩy qua kafka là {len(posts)}")
-                            # crawler_utils.push_kafka(posts=posts, comments=None)
-                except Exception as e:
-                    logger.error(e)
-
-
-            # try: 
-            #     logger.info(f"Crawler post group")
-            #     if self.kwargs['mode_group'] == 'get_link':
-            #         link_post_search_extractor : PostsDesktopGroupExtractor = PostsDesktopGroupExtractor(driver=self.web_browser.driver, group_id = self.kwargs['group_id'],share_queue=self.kwargs['share_queue'])
-            #         link_post_search_extractor.start_get_link_posts()
-            #     elif self.kwargs['mode_group'] == 'ex_post':
-            #         post_search_extractor : PostGroupDeskopExFromLink = PostGroupDeskopExFromLink(driver=self.web_browser.driver, group_id = self.kwargs['group_id'], share_queue=self.kwargs['share_queue'], callback=self.on_post_available_callback)
-            #         for posts in post_search_extractor.start():
-            #             logger.info(f"số bài post group đẩy qua kafka là {len(posts)}")
-            #             # crawler_utils.push_kafka(posts=posts, comments=None) 
-            # except Exception as e:
-            #     logger.error(e)
-
-
-            if self.bCheckout:
-                break
-            time_sleep = 60
-            print(f"Dang sleep {time_sleep}")
-            time.sleep(time_sleep)
-            print("Da xong 1 lan lam viec cua 1 tai khoan")
-
     def work(self):
         print("chuan bi in")
         
         while self.is_active:
-
             if self.mode == 1: 
                 try:
                     logger.info(f"Crawler post search facebook")
@@ -179,14 +134,6 @@ class CrawlerThread(threading.Thread):
                             # crawler_utils.push_kafka(posts=posts, comments=None)
                 except Exception as e:
                     logger.error(e)
-            elif self.mode == 3:
-                # Test
-                url="https://www.facebook.com/dung.vuong.507/posts/pfbid0nSaE1eRYqESKJSowPaTpEXTUqn8JLamu62hfGdgbdQpVs3m9BNMsw35fqgP3cVNul"
-                post_mobile_search_extractor: Test = Test(driver=self.web_browser.driver, type="facebook test", url=url, callback=self.on_post_available_callback)
-                posts = post_mobile_search_extractor.start()
-                logger.info(f"Send {posts} to kafka")
-            elif self.mode == 4:
-                pass
             else:
                 logger.error("Error mode")     
               

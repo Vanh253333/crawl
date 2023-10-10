@@ -105,14 +105,6 @@ class CrawlerManager(object):
             crawler2.start()
             #crawler2.run()
             self.add_crawler(crawler2)
-        elif int(config['mode']['id']) == 3: #mode get post page
-            crawler = CrawlerThread(account, config["account"]["platform"], mode=3, mode_group = "ex_post", group_id =config['mode']['group_id'])
-            crawler.setDaemon(True)
-            #crawler.start()
-            crawler.run()
-            self.add_crawler(crawler)
-        elif int(config['mode']['id']) == 4: #mode auto fb
-            pass
         else:
             logger.error("No mode")
 
